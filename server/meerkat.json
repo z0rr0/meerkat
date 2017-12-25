@@ -1,0 +1,26 @@
+// configration example
+{
+  "admin": {                // web admin interface settings
+    "host": "127.0.0.1",    // HTTP host
+    "port": 43210           // HTTP port
+  },
+  "host": "127.0.0.1",      // server host
+  "port": 54321,            // server port
+  "key": "",                // private RSA key
+  "database": {             // MongoDB configuration
+    "hosts": ["localhost"], // servers list
+    "port": 27017,          // connection port
+    "timeout": 2,           // connection timeout (seconds)
+    "username": "test",     // auth username
+    "password": "test",     // auth password
+    "database": "meerkat",  // database name
+    "authdb": "admin",      // auth database
+    "replica": null,        // replicaset name
+    "ssl": false,           // use SSL connection
+    "sslkeyfile": "",       // SSL key file
+    "reconnects": 3,        // number of reconnects attempts (min 1)
+    "rcntime": 50,          // delay between reconnects attempts (milliseconds)
+    "poollimit": 512,       // sets the maximum number of sockets in use in a single server
+    "debug": false          // debug mode
+  },
+}
