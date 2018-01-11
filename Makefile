@@ -3,6 +3,7 @@ BIN=bin
 ROOTPKG=github.com/z0rr0/meerkat
 VERSION=`bash version.sh $(ROOTPKG)`
 SOURCEDIR=$(GOPATH)/src/$(ROOTPKG)
+TMPDIR=/tmp
 
 
 all: test
@@ -11,7 +12,7 @@ install:
 	go install -ldflags "$(VERSION)" $(ROOTPKG)/server
 
 configs:
-	cp -f $(SOURCEDIR)/server/meerkat.json meerkat.json
+	cp -f $(SOURCEDIR)/server/meerkat.json $(TMPDIR)/meerkat.json
 
 run_server: configs install
 	$(GOPATH)/$(BIN)/server
