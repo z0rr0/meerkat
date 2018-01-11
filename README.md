@@ -2,6 +2,13 @@
 
 It's a monitoring service, yet **NOT READY FOR PRODUCTION**
 
+### Build
+
+[Dep](https://github.com/golang/dep) is used as dependency management tool.
+
+
+
+
 ---
 
 *This source code is governed by a [LGPLv3](https://www.gnu.org/licenses/lgpl-3.0.txt) license that can be found in the [LICENSE](https://github.com/z0rr0/hashq/blob/master/LICENSE) file.*

@@ -1,18 +1,18 @@
 package main
 
 import (
-	"fmt"
-	"log"
-	"net"
-	"sync"
-
 	"context"
 	"crypto/tls"
 	"crypto/x509"
 	"errors"
-	"gopkg.in/mgo.v2"
+	"fmt"
 	"io/ioutil"
+	"log"
+	"net"
+	"sync"
 	"time"
+
+	"gopkg.in/mgo.v2"
 )
 
 const (
@@ -135,7 +135,8 @@ func (c *Config) Close(ctx context.Context) {
 
 // DbConnect sets database connection.
 func (c *Config) DbConnect(ctx context.Context) (context.Context, error) {
-	if c.released {}
+	if c.released {
+	}
 	session, err := CtxGetDBSession(ctx, true)
 	if err == nil {
 		return ctx, nil
