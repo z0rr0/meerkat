@@ -37,10 +37,21 @@ func main() {
 		}
 	}()
 	version := flag.Bool("version", false, "only print version")
+	genkeys := flag.Int("genkeys", 0, "generate RSA keys pair")
 	config := flag.String("config", "meerkat.json", "configuration file")
 	flag.Parse()
+
 	if *version {
 		fmt.Printf("%v: %v %v %v %v\n", Name, Version, Revision, GoVersion, Date)
 		return
 	}
+	if *genkeys > 0 {
+		GenKeys(*genkeys, loggerError)
+		return
+	}
+	_, err := Configuration(*config)
+	if err != nil {
+		loggerError.Fatalln(err)
+	}
+	fmt.Println("ok")
 }

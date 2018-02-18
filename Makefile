@@ -18,7 +18,6 @@ run_server: configs install
 	$(GOPATH)/$(BIN)/server
 
 lint: install
-	go vet $(ROOTPKG)/server
 	golint $(ROOTPKG)/server
 
 test: lint

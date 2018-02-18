@@ -2,14 +2,20 @@ package main
 
 import (
 	"context"
+	"crypto/rand"
+	"crypto/rsa"
 	"crypto/tls"
 	"crypto/x509"
+	"encoding/json"
+	"encoding/pem"
 	"errors"
 	"fmt"
 	"io/ioutil"
 	"log"
 	"net"
-	"sync"
+	"os"
+	"path/filepath"
+	"strings"
 	"time"
 
 	"gopkg.in/mgo.v2"
@@ -48,15 +54,19 @@ type WebAdmin struct {
 	Port uint   `json:"port"`
 }
 
+// Server is main server configuration.
+type Server struct {
+	Host       string `json:"host"`
+	Port       uint   `json:"port"`
+	PrivateKey string `json:"private_key"`
+	privateKey *rsa.PrivateKey
+}
+
 // Config is main configuration info.
 type Config struct {
-	Admin    WebAdmin `json:"admin"`
-	Host     string   `json:"host"`
-	Port     uint     `json:"port"`
-	Key      string   `json:"key"`
+	WebAdmin WebAdmin `json:"web_admin"`
+	Server   Server   `json:"server"`
 	Db       MongoCfg `json:"database"`
-	dbM      sync.Mutex
-	released bool
 }
 
 // Addresses returns an array of available MongoDB connections addresses.
@@ -123,10 +133,6 @@ func (cfg *MongoCfg) credential() error {
 
 // Close releases configuration resources.
 func (c *Config) Close(ctx context.Context) {
-	c.dbM.Lock()
-	defer c.dbM.Unlock()
-	c.released = true
-
 	session, err := CtxGetDBSession(ctx, false)
 	if err == nil {
 		session.Close()
@@ -135,15 +141,10 @@ func (c *Config) Close(ctx context.Context) {
 
 // DbConnect sets database connection.
 func (c *Config) DbConnect(ctx context.Context) (context.Context, error) {
-	if c.released {
-	}
 	session, err := CtxGetDBSession(ctx, true)
 	if err == nil {
 		return ctx, nil
 	}
-	c.dbM.Lock()
-	defer c.dbM.Unlock()
-
 	if session != nil {
 		session.Close()
 	}
@@ -180,4 +181,61 @@ func CtxGetDBSession(ctx context.Context, sendPing bool) (*mgo.Session, error) {
 		return s, s.Ping()
 	}
 	return s, nil
+}
+
+// readConfigurationFile reads file configuration.
+func readConfigurationFile(name string) (*Config, error) {
+	cfg := &Config{}
+	absPath, err := filepath.Abs(strings.Trim(name, " "))
+	if err != nil {
+		return cfg, err
+	}
+	_, err = os.Stat(absPath)
+	if err != nil {
+		return cfg, err
+	}
+	jsonData, err := ioutil.ReadFile(absPath)
+	if err != nil {
+		return cfg, err
+	}
+	err = json.Unmarshal(jsonData, cfg)
+	return cfg, err
+}
+
+// Configuration reads configuration file and does its validation.
+func Configuration(fileName string) (*Config, error) {
+	cfg, err := readConfigurationFile(fileName)
+	if err != nil {
+		return nil, err
+	}
+	data, err := ioutil.ReadFile(cfg.Server.PrivateKey)
+	if err != nil {
+		return nil, err
+	}
+	block, _ := pem.Decode(data)
+	if block == nil || block.Type != "RSA PRIVATE KEY" {
+		return nil, errors.New("failed to decode PEM block containing private key")
+	}
+	pub, err := x509.ParsePKCS1PrivateKey(block.Bytes)
+	if err != nil {
+		return nil, err
+	}
+	cfg.Server.privateKey = pub
+	return cfg, nil
+}
+
+// GenKeys generates and prints new RSA keys pair.
+func GenKeys(bits int, logger *log.Logger) {
+	pk, err := rsa.GenerateKey(rand.Reader, bits)
+	if err != nil {
+		logger.Fatalln(err)
+	}
+	privateKeyPEM := &pem.Block{Type: "RSA PRIVATE KEY", Bytes: x509.MarshalPKCS1PrivateKey(pk)}
+	if err := pem.Encode(os.Stdout, privateKeyPEM); err != nil {
+		logger.Fatalln(err)
+	}
+	publicKeyPEM := &pem.Block{Type: "RSA PUBLIC KEY", Bytes: x509.MarshalPKCS1PublicKey(&pk.PublicKey)}
+	if err := pem.Encode(os.Stdout, publicKeyPEM); err != nil {
+		logger.Fatalln(err)
+	}
 }
