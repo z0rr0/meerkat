@@ -57,7 +57,7 @@ type WebAdmin struct {
 // Server is main server configuration.
 type Server struct {
 	Host       string `json:"host"`
-	Port       uint   `json:"port"`
+	Port       int    `json:"port"`
 	PrivateKey string `json:"private_key"`
 	privateKey *rsa.PrivateKey
 }
@@ -67,6 +67,11 @@ type Config struct {
 	WebAdmin WebAdmin `json:"web_admin"`
 	Server   Server   `json:"server"`
 	Db       MongoCfg `json:"database"`
+}
+
+// UDPAddr return server host:port string.
+func (s *Server) UDPAddr() *net.UDPAddr {
+	return &net.UDPAddr{IP: net.ParseIP(s.Host), Port: s.Port}
 }
 
 // Addresses returns an array of available MongoDB connections addresses.

@@ -4,13 +4,20 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"net"
 	"os"
+	"os/signal"
 	"runtime"
+	"strings"
+	"sync"
+	"syscall"
 )
 
 const (
 	// Name is a program name.
 	Name = "Meerkat"
+	// interruptPrefix is constant prefix of interrupt signal
+	interruptPrefix = "interrupt signal"
 )
 
 var (
@@ -29,7 +36,50 @@ var (
 	loggerInfo = log.New(os.Stdout, fmt.Sprintf("%v [INFO]: ", Name), log.Ldate|log.Ltime|log.Lshortfile)
 )
 
+// interrupt catches custom signals.
+func interrupt(ec chan error) {
+	c := make(chan os.Signal)
+	signal.Notify(c, syscall.SIGINT, syscall.SIGTERM, os.Interrupt)
+	ec <- fmt.Errorf("%v %v", interruptPrefix, <-c)
+}
+
+// listen
+func listen(udpConn *net.UDPConn, wg *sync.WaitGroup, stop chan bool) {
+	wg.Add(1)
+	defer wg.Done()
+
+	bc := make(chan []byte, 4096)
+	defer close(bc)
+
+	go func() {
+		var buf [4096]byte
+		for {
+			n, addr, err := udpConn.ReadFromUDP(buf[:])
+			if err != nil {
+				if msg := err.Error(); strings.Contains(msg, "use of closed network connection") {
+					loggerInfo.Println(err)
+					return
+				} else {
+					loggerError.Println(err)
+				}
+			}
+			loggerInfo.Printf("read from %v\n", addr)
+			bc <- buf[:n]
+		}
+	}()
+
+	for {
+		select {
+		case <-stop:
+			return
+		case b := <-bc:
+			fmt.Printf("data:\n%v\n", b)
+		}
+	}
+}
+
 func main() {
+	var wg sync.WaitGroup
 	defer func() {
 		if r := recover(); r != nil {
 			loggerError.Printf("Unexpected failed\n%v\n", r)
@@ -49,9 +99,31 @@ func main() {
 		GenKeys(*genkeys, loggerError)
 		return
 	}
-	_, err := Configuration(*config)
+	cfg, err := Configuration(*config)
 	if err != nil {
 		loggerError.Fatalln(err)
 	}
-	fmt.Println("ok")
+	loggerInfo.Printf("configuration is read\n%v:%v\n", cfg.Server.Host, cfg.Server.Port)
+
+	udpConn, err := net.ListenUDP("udp", cfg.Server.UDPAddr())
+	if err != nil {
+		loggerError.Fatalln(err)
+	}
+	defer udpConn.Close()
+
+	errChan := make(chan error)
+	stopChan := make(chan bool)
+
+	go interrupt(errChan)
+	go listen(udpConn, &wg, stopChan)
+
+	fmt.Println("1")
+	err = <-errChan
+	fmt.Println("2")
+	close(stopChan)
+	fmt.Println("3")
+	wg.Wait()
+
+	close(errChan)
+	loggerInfo.Println("gacefully stopped")
 }
