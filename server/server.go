@@ -43,13 +43,12 @@ func interrupt(ec chan error) {
 	ec <- fmt.Errorf("%v %v", interruptPrefix, <-c)
 }
 
-// listen
+// listen reads data from UDP socket
 func listen(udpConn *net.UDPConn, wg *sync.WaitGroup, stop chan bool) {
 	wg.Add(1)
 	defer wg.Done()
 
-	bc := make(chan []byte, 4096)
-	defer close(bc)
+	bc := make(chan []byte)
 
 	go func() {
 		var buf [4096]byte
@@ -58,10 +57,10 @@ func listen(udpConn *net.UDPConn, wg *sync.WaitGroup, stop chan bool) {
 			if err != nil {
 				if msg := err.Error(); strings.Contains(msg, "use of closed network connection") {
 					loggerInfo.Println(err)
+					close(bc)
 					return
-				} else {
-					loggerError.Println(err)
 				}
+				loggerError.Println(err)
 			}
 			loggerInfo.Printf("read from %v\n", addr)
 			bc <- buf[:n]
@@ -73,6 +72,7 @@ func listen(udpConn *net.UDPConn, wg *sync.WaitGroup, stop chan bool) {
 		case <-stop:
 			return
 		case b := <-bc:
+			// handled incoming data
 			fmt.Printf("data:\n%v\n", b)
 		}
 	}
@@ -113,17 +113,17 @@ func main() {
 
 	errChan := make(chan error)
 	stopChan := make(chan bool)
+	defer close(errChan)
 
 	go interrupt(errChan)
 	go listen(udpConn, &wg, stopChan)
 
-	fmt.Println("1")
+	// wait error or valid interrupt
 	err = <-errChan
-	fmt.Println("2")
+	// stop upd socket read
 	close(stopChan)
-	fmt.Println("3")
+	// wait graceful stop
 	wg.Wait()
 
-	close(errChan)
-	loggerInfo.Println("gacefully stopped")
+	loggerInfo.Println("gracefully stopped")
 }
