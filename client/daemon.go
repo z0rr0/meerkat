@@ -32,11 +32,11 @@ type output struct {
 }
 
 // worker is a common service worker.
-func worker(cfg *Config, s *Service, co chan<- *output, wg *sync.WaitGroup) {
+func worker(s *Service, co chan<- *output, wg *sync.WaitGroup) {
 	var err error
 	defer wg.Done()
 
-	out := make([]byte, packet.MaxPacketSize)
+	buf := make([]byte, packet.MaxPacketSize)
 	o := &output{s: s, b: make([]byte, packet.MaxPacketSize)}
 
 	loggerInfo.Printf("run worker [%v], period=%v seconds\n", s.Name, s.Period)
@@ -45,7 +45,7 @@ func worker(cfg *Config, s *Service, co chan<- *output, wg *sync.WaitGroup) {
 	defer timer.Stop()
 
 	for range timer.C {
-		out, err = exec.Command(s.Exec, s.Args...).Output()
+		buf, err = exec.Command(s.Exec, s.Args...).Output()
 		if err != nil {
 			loggerError.Printf("worker [%v] [ignore=%v], error: %v\n", s.Name, s.IgnoreErrors, err)
 			if !s.IgnoreErrors {
@@ -53,11 +53,11 @@ func worker(cfg *Config, s *Service, co chan<- *output, wg *sync.WaitGroup) {
 				return
 			}
 		}
-		if l := len(out); l > packet.MaxPacketSize {
+		if l := len(buf); l > packet.MaxPacketSize {
 			loggerError.Printf("worker [%v], too match packet %v bytes", s.Name, l)
 		} else {
 			loggerInfo.Printf("worker [%v]: %v bytes\n", s.Name, l)
-			copy(o.b, out[0:])
+			copy(o.b, buf[0:])
 			co <- o
 		}
 		timer.Reset(d)
@@ -68,7 +68,7 @@ func worker(cfg *Config, s *Service, co chan<- *output, wg *sync.WaitGroup) {
 func consume(co <-chan *output) {
 	for out := range co {
 		// send to server
-		loggerInfo.Printf("handle worker [%v]: %v\n", out.s.Name, string(out.b))
+		loggerInfo.Printf("handle worker [%v]: \n%v\n", out.s.Name, string(out.b))
 	}
 }
 
@@ -83,10 +83,11 @@ func Run(cfg *Config, ec chan error) {
 	}
 
 	co := make(chan *output)
+	defer close(co) // only there are no working services
 	go consume(co)
 
 	for i := range cfg.Services {
-		go worker(cfg, &cfg.Services[i], co, &wg)
+		go worker(&cfg.Services[i], co, &wg)
 	}
 	wg.Wait()
 	ec <- nil
