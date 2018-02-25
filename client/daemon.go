@@ -17,6 +17,9 @@
 package main
 
 import (
+	"crypto/rand"
+	"crypto/rsa"
+	"crypto/sha256"
 	"errors"
 	"os/exec"
 	"sync"
@@ -25,19 +28,21 @@ import (
 	"github.com/z0rr0/meerkat/packet"
 )
 
-// output is command result
-type output struct {
-	s *Service
-	b []byte
-}
+var (
+	workersMap = map[string]func(*Service, chan<- *packet.Packet, *sync.WaitGroup){
+		"command": workerCommand,
+		//"memory"
+		//"cpu"
+	}
+)
 
-// worker is a common service worker.
-func worker(s *Service, co chan<- *output, wg *sync.WaitGroup) {
+// workerCommand is a common service worker.
+func workerCommand(s *Service, co chan<- *packet.Packet, wg *sync.WaitGroup) {
 	var err error
 	defer wg.Done()
 
 	buf := make([]byte, packet.MaxPacketSize)
-	o := &output{s: s, b: make([]byte, packet.MaxPacketSize)}
+	p := &packet.Packet{Name: s.Name, Payload: make([]byte, packet.MaxPacketSize)}
 
 	loggerInfo.Printf("run worker [%v], period=%v seconds\n", s.Name, s.Period)
 	d := time.Duration(s.Period) * time.Second
@@ -57,18 +62,27 @@ func worker(s *Service, co chan<- *output, wg *sync.WaitGroup) {
 			loggerError.Printf("worker [%v], too match packet %v bytes", s.Name, l)
 		} else {
 			loggerInfo.Printf("worker [%v]: %v bytes\n", s.Name, l)
-			copy(o.b, buf[0:])
-			co <- o
+			copy(p.Payload, buf[0:l])
+			co <- p
 		}
 		timer.Reset(d)
 	}
 }
 
 // consume handles command outputs.
-func consume(co <-chan *output) {
+func consume(s *Server, co <-chan *packet.Packet) {
 	for out := range co {
 		// send to server
-		loggerInfo.Printf("handle worker [%v]: \n%v\n", out.s.Name, string(out.b))
+		encrypted, err := rsa.EncryptOAEP(sha256.New(), rand.Reader, s.publicKey, out.Payload, nil)
+		if err != nil {
+			loggerError.Printf("error encrypted, worker [%v] - %v bytes: %v\n", out.Name, len(out.Payload), err)
+		} else {
+			loggerInfo.Printf("handle worker [%v] message [%v]: \n%v\n", out.Name, len(out.Payload), string(out.Payload))
+			err = s.send(encrypted)
+			if err != nil {
+				loggerError.Printf("error during message sending: %v\n", err)
+			}
+		}
 	}
 }
 
@@ -82,12 +96,17 @@ func Run(cfg *Config, ec chan error) {
 		wg.Add(l)
 	}
 
-	co := make(chan *output)
-	defer close(co) // only there are no working services
-	go consume(co)
+	co := make(chan *packet.Packet)
+	defer close(co) // only if no working services
+	go consume(&cfg.Server, co)
 
-	for i := range cfg.Services {
-		go worker(&cfg.Services[i], co, &wg)
+	for i, s := range cfg.Services {
+		if worker, ok := workersMap[s.Type]; ok {
+			go worker(&cfg.Services[i], co, &wg)
+		} else {
+			loggerError.Printf("unknown service [%v] type: '%v'\n", s.Name, s.Type)
+			wg.Done()
+		}
 	}
 	wg.Wait()
 	ec <- nil

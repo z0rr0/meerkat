@@ -24,11 +24,19 @@ import (
 )
 
 const (
+	// KeySize is RSA public key size.
+	KeySize = 512 // 4096 / 8
 	// MaxPacketSize is max UDP packet size.
-	MaxPacketSize = 8192
+	MaxPacketSize = 446 // 446 = KeySize - 2*(hash size) - 2 = 512 - 64 - 2
 	// InterruptPrefix is constant prefix of interrupt signal
 	InterruptPrefix = "interrupt signal"
 )
+
+// Packet is main packet structure.
+type Packet struct {
+	Name    string
+	Payload []byte
+}
 
 // Interrupt catches custom signals.
 func Interrupt(ec chan error) {

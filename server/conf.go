@@ -85,7 +85,7 @@ type Config struct {
 	Db       MongoCfg `json:"database"`
 }
 
-// UDPAddr return server host:port string.
+// UDPAddr returns server udp address.
 func (s *Server) UDPAddr() *net.UDPAddr {
 	return &net.UDPAddr{IP: net.ParseIP(s.Host), Port: s.Port}
 }

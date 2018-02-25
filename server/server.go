@@ -24,7 +24,6 @@ import (
 	"net"
 	"os"
 	"runtime"
-	"strings"
 	"sync"
 
 	"github.com/z0rr0/meerkat/packet"
@@ -50,41 +49,6 @@ var (
 	// loggerInfo is a logger for debug/info messages
 	loggerInfo = log.New(os.Stdout, fmt.Sprintf("%v [INFO]: ", Name), log.Ldate|log.Ltime|log.Lshortfile)
 )
-
-// listen reads data from UDP socket
-func listen(udpConn *net.UDPConn, wg *sync.WaitGroup, stop chan bool) {
-	wg.Add(1)
-	defer wg.Done()
-
-	bc := make(chan []byte)
-	go func() {
-		var buf [packet.MaxPacketSize]byte
-		//buf := make([]byte, 5)
-		for {
-			n, addr, err := udpConn.ReadFromUDP(buf[:])
-			if err != nil {
-				if msg := err.Error(); strings.Contains(msg, "use of closed network connection") {
-					loggerInfo.Println(err)
-					close(bc)
-					return
-				}
-				loggerError.Println(err)
-			}
-			loggerInfo.Printf("read %v bytes from %v\n", n, addr)
-			bc <- buf[:n]
-		}
-	}()
-
-	for {
-		select {
-		case <-stop:
-			return
-		case b := <-bc:
-			// handled incoming data
-			fmt.Printf("data:\n%v\n", len(b))
-		}
-	}
-}
 
 func main() {
 	var wg sync.WaitGroup
@@ -124,7 +88,7 @@ func main() {
 	defer close(errChan)
 
 	go packet.Interrupt(errChan)
-	go listen(udpConn, &wg, stopChan)
+	go listen(udpConn, cfg.Server.privateKey, &wg, stopChan)
 
 	// wait error or valid interrupt
 	err = <-errChan

@@ -23,6 +23,7 @@ import (
 	"encoding/pem"
 	"errors"
 	"io/ioutil"
+	"net"
 	"os"
 	"path/filepath"
 	"strings"
@@ -34,6 +35,7 @@ type Server struct {
 	Port      int    `json:"port"`
 	PublicKey string `json:"public_key"`
 	publicKey *rsa.PublicKey
+	udpConn   *net.UDPConn
 }
 
 // Service is client service struct.
@@ -50,6 +52,21 @@ type Service struct {
 type Config struct {
 	Server   Server    `json:"server"`
 	Services []Service `json:"services"`
+}
+
+// send write udp message to remove server.
+func (s *Server) send(msg []byte) error {
+	n, err := s.udpConn.Write(msg)
+	if err != nil {
+		return err
+	}
+	loggerInfo.Printf("wrote %v bytes\n", n)
+	return nil
+}
+
+// UDPAddr returns server udp address.
+func (s *Server) UDPAddr() *net.UDPAddr {
+	return &net.UDPAddr{IP: net.ParseIP(s.Host), Port: s.Port}
 }
 
 // readConfigurationFile reads file configuration.
@@ -90,5 +107,10 @@ func Configuration(fileName string) (*Config, error) {
 		return nil, err
 	}
 	cfg.Server.publicKey = key
+	udpConn, err := net.DialUDP("udp", nil, cfg.Server.UDPAddr())
+	if err != nil {
+		return nil, err
+	}
+	cfg.Server.udpConn = udpConn
 	return cfg, nil
 }
