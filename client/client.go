@@ -1,3 +1,19 @@
+// Copyright 2018 Alexander Zaytsev <thebestzorro@yandex.ru>
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with this program.  If not, see <http://www.gnu.org/licenses/>.
+//
+// Package main implements client part of Meerkat project.
 package main
 
 import (
@@ -6,6 +22,8 @@ import (
 	"log"
 	"os"
 	"runtime"
+
+	"github.com/z0rr0/meerkat/packet"
 )
 
 const (
@@ -28,7 +46,7 @@ var (
 	// loggerError is a logger for error messages
 	loggerError = log.New(os.Stderr, fmt.Sprintf("%v [ERROR]: ", Name), log.Ldate|log.Lmicroseconds|log.Lshortfile)
 	// loggerInfo is a logger for debug/info messages
-	//loggerInfo = log.New(os.Stdout, fmt.Sprintf("%v [INFO]: ", Name), log.Ldate|log.Ltime|log.Lshortfile)
+	loggerInfo = log.New(os.Stdout, fmt.Sprintf("%v [INFO]: ", Name), log.Ldate|log.Ltime|log.Lshortfile)
 )
 
 func main() {
@@ -39,11 +57,25 @@ func main() {
 		}
 	}()
 	version := flag.Bool("version", false, "only print version")
-	//config := flag.String("config", "meerkat.json", "configuration file")
+	config := flag.String("config", "meerkat_client.json", "client configuration file")
 	flag.Parse()
 
 	if *version {
 		fmt.Printf("%v: %v %v %v %v\n", Name, Version, Revision, GoVersion, Date)
 		return
 	}
+
+	cfg, err := Configuration(*config)
+	if err != nil {
+		loggerError.Fatalln(err)
+	}
+	loggerInfo.Printf("configuration is read\nServer %v:%v\n", cfg.Server.Host, cfg.Server.Port)
+
+	errChan := make(chan error)
+	defer close(errChan)
+
+	go packet.Interrupt(errChan)
+	go Run(cfg, errChan)
+
+	loggerError.Println(<-errChan)
 }

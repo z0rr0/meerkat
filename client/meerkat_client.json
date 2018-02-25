@@ -1,0 +1,17 @@
+{
+  "server": {
+    "host": "127.0.0.1",
+    "port": 43211,
+    "public_key": "id_rsa.pub"
+  },
+  "services": [
+    {
+      "name": "test",
+      "type": "command",
+      "exec": "/usr/bin/free",
+      "args": ["-m"],
+      "ignore_errors": true,
+      "period": 5
+    }
+  ]
+}

@@ -1,3 +1,20 @@
+// Copyright 2018 Alexander Zaytsev <thebestzorro@yandex.ru>
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with this program.  If not, see <http://www.gnu.org/licenses/>.
+//
+// Package main implements server part of Meerkat project.
+
 package main
 
 import (
@@ -6,18 +23,16 @@ import (
 	"log"
 	"net"
 	"os"
-	"os/signal"
 	"runtime"
 	"strings"
 	"sync"
-	"syscall"
+
+	"github.com/z0rr0/meerkat/packet"
 )
 
 const (
 	// Name is a program name.
 	Name = "Meerkat"
-	// interruptPrefix is constant prefix of interrupt signal
-	interruptPrefix = "interrupt signal"
 )
 
 var (
@@ -36,22 +51,15 @@ var (
 	loggerInfo = log.New(os.Stdout, fmt.Sprintf("%v [INFO]: ", Name), log.Ldate|log.Ltime|log.Lshortfile)
 )
 
-// interrupt catches custom signals.
-func interrupt(ec chan error) {
-	c := make(chan os.Signal)
-	signal.Notify(c, syscall.SIGINT, syscall.SIGTERM, os.Interrupt)
-	ec <- fmt.Errorf("%v %v", interruptPrefix, <-c)
-}
-
 // listen reads data from UDP socket
 func listen(udpConn *net.UDPConn, wg *sync.WaitGroup, stop chan bool) {
 	wg.Add(1)
 	defer wg.Done()
 
 	bc := make(chan []byte)
-
 	go func() {
-		var buf [4096]byte
+		var buf [packet.MaxPacketSize]byte
+		//buf := make([]byte, 5)
 		for {
 			n, addr, err := udpConn.ReadFromUDP(buf[:])
 			if err != nil {
@@ -62,7 +70,7 @@ func listen(udpConn *net.UDPConn, wg *sync.WaitGroup, stop chan bool) {
 				}
 				loggerError.Println(err)
 			}
-			loggerInfo.Printf("read from %v\n", addr)
+			loggerInfo.Printf("read %v bytes from %v\n", n, addr)
 			bc <- buf[:n]
 		}
 	}()
@@ -73,7 +81,7 @@ func listen(udpConn *net.UDPConn, wg *sync.WaitGroup, stop chan bool) {
 			return
 		case b := <-bc:
 			// handled incoming data
-			fmt.Printf("data:\n%v\n", b)
+			fmt.Printf("data:\n%v\n", len(b))
 		}
 	}
 }
@@ -115,7 +123,7 @@ func main() {
 	stopChan := make(chan bool)
 	defer close(errChan)
 
-	go interrupt(errChan)
+	go packet.Interrupt(errChan)
 	go listen(udpConn, &wg, stopChan)
 
 	// wait error or valid interrupt

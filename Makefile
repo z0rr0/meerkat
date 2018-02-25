@@ -11,6 +11,7 @@ all: test
 install:
 	go install -ldflags "$(VERSION)" $(ROOTPKG)/server
 	go install -ldflags "$(VERSION)" $(ROOTPKG)/client
+	go install -ldflags "$(VERSION)" $(ROOTPKG)/packet
 
 configs:
 	cp -f $(SOURCEDIR)/server/meerkat.json $(TMPDIR)/meerkat.json
@@ -19,17 +20,19 @@ run_server: configs install
 	$(GOPATH)/$(BIN)/server
 
 lint: install
-	golint $(ROOTPKG)/server
+	golint $(ROOTPKG)/packet
 	golint $(ROOTPKG)/client
+	golint $(ROOTPKG)/server
 
 test: lint
 	# go tool cover -html=coverage.out
 	# go tool trace ratest.test trace.out
 	go test -race -v -cover -coverprofile=server_coverage.out -trace server_trace.out $(ROOTPKG)/server
-	go test -race -v -cover -coverprofile=server_coverage.out -trace server_trace.out $(ROOTPKG)/client
+	go test -race -v -cover -coverprofile=client_coverage.out -trace client_trace.out $(ROOTPKG)/client
 
 bench: lint
-	go test -bench=. -benchmem -v $(ROOTPKG)/server
+	go test -bench=. -benchmem -v $(ROOTPKG)/packet
+	go test -bench=. -benchmem -v $(ROOTPKG)/client
 	go test -bench=. -benchmem -v $(ROOTPKG)/client
 
 clean:
