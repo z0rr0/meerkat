@@ -42,9 +42,9 @@ func listen(udpConn *net.UDPConn, privateKey *rsa.PrivateKey, wg *sync.WaitGroup
 	wg.Add(1)
 	defer wg.Done()
 
+	buf := make([]byte, packet.MaxPacketSize(&privateKey.PublicKey))
 	bc := make(chan []byte)
 	go func() {
-		var buf [packet.KeySize]byte
 		for {
 			n, addr, err := udpConn.ReadFromUDP(buf[:])
 			if err != nil {

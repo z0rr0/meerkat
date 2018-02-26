@@ -29,7 +29,7 @@ import (
 )
 
 var (
-	workersMap = map[string]func(*Service, chan<- *packet.Packet, *sync.WaitGroup){
+	workersMap = map[string]func(*Service, int, chan<- *packet.Packet, *sync.WaitGroup){
 		"command": workerCommand,
 		//"memory"
 		//"cpu"
@@ -37,12 +37,12 @@ var (
 )
 
 // workerCommand is a common service worker.
-func workerCommand(s *Service, co chan<- *packet.Packet, wg *sync.WaitGroup) {
+func workerCommand(s *Service, packetSize int, co chan<- *packet.Packet, wg *sync.WaitGroup) {
 	var err error
 	defer wg.Done()
 
-	buf := make([]byte, packet.MaxPacketSize)
-	p := &packet.Packet{Name: s.Name, Payload: make([]byte, packet.MaxPacketSize)}
+	buf := make([]byte, packetSize)
+	p := &packet.Packet{Name: s.Name, Payload: make([]byte, packetSize)}
 
 	loggerInfo.Printf("run worker [%v], period=%v seconds\n", s.Name, s.Period)
 	d := time.Duration(s.Period) * time.Second
@@ -58,7 +58,7 @@ func workerCommand(s *Service, co chan<- *packet.Packet, wg *sync.WaitGroup) {
 				return
 			}
 		}
-		if l := len(buf); l > packet.MaxPacketSize {
+		if l := len(buf); l > packetSize {
 			loggerError.Printf("worker [%v], too match packet %v bytes", s.Name, l)
 		} else {
 			loggerInfo.Printf("worker [%v]: %v bytes\n", s.Name, l)
@@ -102,7 +102,7 @@ func Run(cfg *Config, ec chan error) {
 
 	for i, s := range cfg.Services {
 		if worker, ok := workersMap[s.Type]; ok {
-			go worker(&cfg.Services[i], co, &wg)
+			go worker(&cfg.Services[i], packet.MaxPacketPayloadSize(cfg.Server.publicKey), co, &wg)
 		} else {
 			loggerError.Printf("unknown service [%v] type: '%v'\n", s.Name, s.Type)
 			wg.Done()

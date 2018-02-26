@@ -17,6 +17,7 @@
 package packet
 
 import (
+	"crypto/rsa"
 	"fmt"
 	"os"
 	"os/signal"
@@ -24,10 +25,8 @@ import (
 )
 
 const (
-	// KeySize is RSA public key size.
-	KeySize = 512 // 4096 / 8
-	// MaxPacketSize is max UDP packet size.
-	MaxPacketSize = 446 // 446 = KeySize - 2*(hash size) - 2 = 512 - 64 - 2
+	// hashSize is SHA256 hash bytes size.
+	hashSize = 32
 	// InterruptPrefix is constant prefix of interrupt signal
 	InterruptPrefix = "interrupt signal"
 )
@@ -36,6 +35,16 @@ const (
 type Packet struct {
 	Name    string
 	Payload []byte
+}
+
+// MaxPacketSize is max total packet size/
+func MaxPacketSize(publicKey *rsa.PublicKey) int {
+	return publicKey.N.BitLen() / 8
+}
+
+// MaxPacketPayloadSize calculates max UDP packet size.
+func MaxPacketPayloadSize(publicKey *rsa.PublicKey) int {
+	return MaxPacketSize(publicKey) - 2*hashSize - 2
 }
 
 // Interrupt catches custom signals.
