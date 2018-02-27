@@ -12,9 +12,8 @@
 //
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
-//
-// Package main implements server part of Meerkat project.
 
+// Package main implements server part of Meerkat project.
 package main
 
 import (
@@ -29,11 +28,12 @@ import (
 )
 
 func receive(privateKey *rsa.PrivateKey, msg []byte) error {
-	text, err := rsa.DecryptOAEP(sha256.New(), rand.Reader, privateKey, msg, nil)
+	b, err := rsa.DecryptOAEP(sha256.New(), rand.Reader, privateKey, msg, nil)
 	if err != nil {
 		return err
 	}
-	loggerInfo.Printf("receive data\n%v\n", string(text))
+	p := packet.Decode(b)
+	loggerInfo.Printf("receive from %v data\n%v\n", p.ServiceID, string(p.Payload))
 	return nil
 }
 

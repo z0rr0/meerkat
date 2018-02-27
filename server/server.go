@@ -12,9 +12,8 @@
 //
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
-//
-// Package main implements server part of Meerkat project.
 
+// Package main implements server part of Meerkat project.
 package main
 
 import (

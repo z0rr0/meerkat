@@ -12,7 +12,7 @@
 //
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
-//
+
 // Package main implements client part of Meerkat project.
 package main
 
@@ -29,7 +29,7 @@ import (
 )
 
 var (
-	workersMap = map[string]func(*Service, int, chan<- *packet.Packet, *sync.WaitGroup){
+	workersMap = map[string]func(*Service, uint16, int, chan<- *packet.Packet, *sync.WaitGroup){
 		"command": workerCommand,
 		//"memory"
 		//"cpu"
@@ -37,12 +37,12 @@ var (
 )
 
 // workerCommand is a common service worker.
-func workerCommand(s *Service, packetSize int, co chan<- *packet.Packet, wg *sync.WaitGroup) {
+func workerCommand(s *Service, serviceID uint16, packetSize int, co chan<- *packet.Packet, wg *sync.WaitGroup) {
 	var err error
 	defer wg.Done()
 
 	buf := make([]byte, packetSize)
-	p := &packet.Packet{Name: s.Name, Payload: make([]byte, packetSize)}
+	p := &packet.Packet{ServiceID: serviceID, Payload: make([]byte, packetSize)}
 
 	loggerInfo.Printf("run worker [%v], period=%v seconds\n", s.Name, s.Period)
 	d := time.Duration(s.Period) * time.Second
@@ -73,11 +73,11 @@ func workerCommand(s *Service, packetSize int, co chan<- *packet.Packet, wg *syn
 func consume(s *Server, co <-chan *packet.Packet) {
 	for out := range co {
 		// send to server
-		encrypted, err := rsa.EncryptOAEP(sha256.New(), rand.Reader, s.publicKey, out.Payload, nil)
+		encrypted, err := rsa.EncryptOAEP(sha256.New(), rand.Reader, s.publicKey, packet.Encode(out), nil)
 		if err != nil {
-			loggerError.Printf("error encrypted, worker [%v] - %v bytes: %v\n", out.Name, len(out.Payload), err)
+			loggerError.Printf("error encrypted, worker [%v] - %v bytes: %v\n", out.ServiceID, len(out.Payload), err)
 		} else {
-			loggerInfo.Printf("handle worker [%v] message [%v]: \n%v\n", out.Name, len(out.Payload), string(out.Payload))
+			loggerInfo.Printf("handle worker [%v] message [%v]: \n%v\n", out.ServiceID, len(out.Payload), string(out.Payload))
 			err = s.send(encrypted)
 			if err != nil {
 				loggerError.Printf("error during message sending: %v\n", err)
@@ -89,20 +89,23 @@ func consume(s *Server, co <-chan *packet.Packet) {
 // Run starts main services.
 func Run(cfg *Config, ec chan error) {
 	var wg sync.WaitGroup
-	if l := len(cfg.Services); l == 0 {
+
+	l := len(cfg.Services)
+	if l == 0 {
 		ec <- errors.New("no services for running")
 		return
-	} else {
-		wg.Add(l)
 	}
+	wg.Add(l)
 
 	co := make(chan *packet.Packet)
 	defer close(co) // only if no working services
+
+	maxPacketSize := packet.MaxPacketPayloadSize(cfg.Server.publicKey)
 	go consume(&cfg.Server, co)
 
 	for i, s := range cfg.Services {
 		if worker, ok := workersMap[s.Type]; ok {
-			go worker(&cfg.Services[i], packet.MaxPacketPayloadSize(cfg.Server.publicKey), co, &wg)
+			go worker(&cfg.Services[i], uint16(i), maxPacketSize, co, &wg)
 		} else {
 			loggerError.Printf("unknown service [%v] type: '%v'\n", s.Name, s.Type)
 			wg.Done()

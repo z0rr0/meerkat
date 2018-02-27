@@ -12,12 +12,13 @@
 //
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
-//
-// Package main implements client/server common part - packet settings/methods.
+
+// Package packet implements client/server common part - packet settings/methods.
 package packet
 
 import (
 	"crypto/rsa"
+	"encoding/binary"
 	"fmt"
 	"os"
 	"os/signal"
@@ -32,9 +33,28 @@ const (
 )
 
 // Packet is main packet structure.
+// Byte encoded packet cannot be bigger than MaxPacketPayloadSize().
 type Packet struct {
-	Name    string
-	Payload []byte
+	ServiceID uint16 // 2 bytes
+	ClientID  []byte // hashSize bytes
+	Payload   []byte
+}
+
+
+// Encode encodes p Packet to byte slice.
+func Encode(p *Packet) []byte {
+	b := make([]byte, 2, len(p.Payload)+hashSize+2)
+	binary.LittleEndian.PutUint16(b, p.ServiceID)
+	b = append(b, p.ClientID...)
+	return append(b, p.Payload...)
+}
+
+// Decode decodes bytes to Packet struct.
+func Decode(b []byte) *Packet {
+	return &Packet{
+		ServiceID: binary.LittleEndian.Uint16(b[:2]),
+		ClientID:  b[2 : hashSize+2],
+		Payload:   b[hashSize+2:]}
 }
 
 // MaxPacketSize is max total packet size/
@@ -44,7 +64,8 @@ func MaxPacketSize(publicKey *rsa.PublicKey) int {
 
 // MaxPacketPayloadSize calculates max UDP packet size.
 func MaxPacketPayloadSize(publicKey *rsa.PublicKey) int {
-	return MaxPacketSize(publicKey) - 2*hashSize - 2
+	// public exponent module size - 2*SHA256 - 2 - sizeof(Packet.ClientID) - sizeof(Packet.ServiceID)
+	return MaxPacketSize(publicKey) - 2*hashSize - 2 - hashSize - 2
 }
 
 // Interrupt catches custom signals.
