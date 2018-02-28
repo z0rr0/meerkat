@@ -27,8 +27,9 @@ lint: install
 test: lint
 	# go tool cover -html=coverage.out
 	# go tool trace ratest.test trace.out
-	go test -race -v -cover -coverprofile=server_coverage.out -trace server_trace.out $(ROOTPKG)/server
-	go test -race -v -cover -coverprofile=client_coverage.out -trace client_trace.out $(ROOTPKG)/client
+#	go test -race -v -cover -coverprofile=server_coverage.out -trace server_trace.out $(ROOTPKG)/server
+#	go test -race -v -cover -coverprofile=client_coverage.out -trace client_trace.out $(ROOTPKG)/client
+	go test -race -v -cover -coverprofile=client_coverage.out -trace client_trace.out $(ROOTPKG)/packet
 
 bench: lint
 	go test -bench=. -benchmem -v $(ROOTPKG)/packet

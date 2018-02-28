@@ -40,7 +40,6 @@ type Packet struct {
 	Payload   []byte
 }
 
-
 // Encode encodes p Packet to byte slice.
 func Encode(p *Packet) []byte {
 	b := make([]byte, 2, len(p.Payload)+hashSize+2)
@@ -65,7 +64,7 @@ func MaxPacketSize(publicKey *rsa.PublicKey) int {
 // MaxPacketPayloadSize calculates max UDP packet size.
 func MaxPacketPayloadSize(publicKey *rsa.PublicKey) int {
 	// public exponent module size - 2*SHA256 - 2 - sizeof(Packet.ClientID) - sizeof(Packet.ServiceID)
-	return MaxPacketSize(publicKey) - 2*hashSize - 2 - hashSize - 2
+	return MaxPacketSize(publicKey) - 3*hashSize - 4
 }
 
 // Interrupt catches custom signals.
