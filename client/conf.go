@@ -40,7 +40,6 @@ type Server struct {
 
 // Service is client service struct.
 type Service struct {
-	Name         string   `json:"name"`
 	Type         string   `json:"type"`
 	Exec         string   `json:"exec"`
 	Args         []string `json:"args"`

@@ -44,7 +44,7 @@ func workerCommand(s *Service, serviceID uint16, packetSize int, co chan<- *pack
 	buf := make([]byte, packetSize)
 	p := &packet.Packet{ServiceID: serviceID, Payload: make([]byte, packetSize)}
 
-	loggerInfo.Printf("run worker [%v], period=%v seconds\n", s.Name, s.Period)
+	loggerInfo.Printf("run worker [%v], period=%v seconds\n", serviceID, s.Period)
 	d := time.Duration(s.Period) * time.Second
 	timer := time.NewTimer(d)
 	defer timer.Stop()
@@ -52,16 +52,16 @@ func workerCommand(s *Service, serviceID uint16, packetSize int, co chan<- *pack
 	for range timer.C {
 		buf, err = exec.Command(s.Exec, s.Args...).Output()
 		if err != nil {
-			loggerError.Printf("worker [%v] [ignore=%v], error: %v\n", s.Name, s.IgnoreErrors, err)
+			loggerError.Printf("worker [%v] [ignore=%v], error: %v\n", serviceID, s.IgnoreErrors, err)
 			if !s.IgnoreErrors {
 				// error without ignoring, exit
 				return
 			}
 		}
 		if l := len(buf); l > packetSize {
-			loggerError.Printf("worker [%v], too match packet %v bytes", s.Name, l)
+			loggerError.Printf("worker [%v], too match packet %v bytes", serviceID, l)
 		} else {
-			loggerInfo.Printf("worker [%v]: %v bytes\n", s.Name, l)
+			loggerInfo.Printf("worker [%v]: %v bytes\n", serviceID, l)
 			copy(p.Payload, buf[0:l])
 			co <- p
 		}
@@ -104,10 +104,11 @@ func Run(cfg *Config, ec chan error) {
 	go consume(&cfg.Server, co)
 
 	for i, s := range cfg.Services {
+		serviceID := uint16(i)
 		if worker, ok := workersMap[s.Type]; ok {
-			go worker(&cfg.Services[i], uint16(i), maxPacketSize, co, &wg)
+			go worker(&cfg.Services[i], serviceID, maxPacketSize, co, &wg)
 		} else {
-			loggerError.Printf("unknown service [%v] type: '%v'\n", s.Name, s.Type)
+			loggerError.Printf("unknown service [%v] type: '%v'\n", serviceID, s.Type)
 			wg.Done()
 		}
 	}
