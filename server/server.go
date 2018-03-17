@@ -25,6 +25,7 @@ import (
 	"runtime"
 	"sync"
 
+	"github.com/z0rr0/meerkat/conf"
 	"github.com/z0rr0/meerkat/packet"
 )
 
@@ -70,7 +71,8 @@ func main() {
 		GenKeys(*genkeys, loggerError)
 		return
 	}
-	cfg, err := Configuration(*config)
+	cfg := &Config{}
+	err := conf.ReadFile(cfg, *config)
 	if err != nil {
 		loggerError.Fatalln(err)
 	}

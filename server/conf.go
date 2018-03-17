@@ -22,7 +22,6 @@ import (
 	"crypto/rsa"
 	"crypto/tls"
 	"crypto/x509"
-	"encoding/json"
 	"encoding/pem"
 	"errors"
 	"fmt"
@@ -30,8 +29,6 @@ import (
 	"log"
 	"net"
 	"os"
-	"path/filepath"
-	"strings"
 	"time"
 
 	"gopkg.in/mgo.v2"
@@ -187,6 +184,20 @@ func (c *Config) DbConnect(ctx context.Context) (context.Context, error) {
 	return CtxSetDBSession(ctx, session), nil
 }
 
+// Load initializes server configuration.
+func (c *Config) Load(data []byte) error {
+	block, _ := pem.Decode(data)
+	if block == nil || block.Type != "RSA PRIVATE KEY" {
+		return errors.New("failed to decode PEM block containing private key")
+	}
+	key, err := x509.ParsePKCS1PrivateKey(block.Bytes)
+	if err != nil {
+		return err
+	}
+	c.Server.privateKey = key
+	return nil
+}
+
 // CtxSetDBSession saves db session object to the context.
 func CtxSetDBSession(ctx context.Context, s *mgo.Session) context.Context {
 	return context.WithValue(ctx, dbSessionKey, s)
@@ -202,47 +213,6 @@ func CtxGetDBSession(ctx context.Context, sendPing bool) (*mgo.Session, error) {
 		return s, s.Ping()
 	}
 	return s, nil
-}
-
-// readConfigurationFile reads file configuration.
-func readConfigurationFile(name string) (*Config, error) {
-	cfg := &Config{}
-	absPath, err := filepath.Abs(strings.Trim(name, " "))
-	if err != nil {
-		return cfg, err
-	}
-	_, err = os.Stat(absPath)
-	if err != nil {
-		return cfg, err
-	}
-	jsonData, err := ioutil.ReadFile(absPath)
-	if err != nil {
-		return cfg, err
-	}
-	err = json.Unmarshal(jsonData, cfg)
-	return cfg, err
-}
-
-// Configuration reads configuration file and does its validation.
-func Configuration(fileName string) (*Config, error) {
-	cfg, err := readConfigurationFile(fileName)
-	if err != nil {
-		return nil, err
-	}
-	data, err := ioutil.ReadFile(cfg.Server.PrivateKey)
-	if err != nil {
-		return nil, err
-	}
-	block, _ := pem.Decode(data)
-	if block == nil || block.Type != "RSA PRIVATE KEY" {
-		return nil, errors.New("failed to decode PEM block containing private key")
-	}
-	key, err := x509.ParsePKCS1PrivateKey(block.Bytes)
-	if err != nil {
-		return nil, err
-	}
-	cfg.Server.privateKey = key
-	return cfg, nil
 }
 
 // GenKeys generates and prints new RSA keys pair.

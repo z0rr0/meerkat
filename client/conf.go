@@ -19,14 +19,9 @@ package main
 import (
 	"crypto/rsa"
 	"crypto/x509"
-	"encoding/json"
 	"encoding/pem"
 	"errors"
-	"io/ioutil"
 	"net"
-	"os"
-	"path/filepath"
-	"strings"
 )
 
 // Server is main server configuration.
@@ -53,6 +48,25 @@ type Config struct {
 	Services []Service `json:"services"`
 }
 
+// Load initializes client configuration.
+func (c *Config) Load(data []byte) error {
+	block, _ := pem.Decode(data)
+	if block == nil || block.Type != "RSA PUBLIC KEY" {
+		return errors.New("failed to decode PEM block containing public key")
+	}
+	key, err := x509.ParsePKCS1PublicKey(block.Bytes)
+	if err != nil {
+		return err
+	}
+	c.Server.publicKey = key
+	udpConn, err := net.DialUDP("udp", nil, c.Server.UDPAddr())
+	if err != nil {
+		return err
+	}
+	c.Server.udpConn = udpConn
+	return nil
+}
+
 // send write udp message to remove server.
 func (s *Server) send(msg []byte) error {
 	n, err := s.udpConn.Write(msg)
@@ -66,50 +80,4 @@ func (s *Server) send(msg []byte) error {
 // UDPAddr returns server udp address.
 func (s *Server) UDPAddr() *net.UDPAddr {
 	return &net.UDPAddr{IP: net.ParseIP(s.Host), Port: s.Port}
-}
-
-// readConfigurationFile reads file configuration.
-func readConfigurationFile(name string) (*Config, error) {
-	cfg := &Config{}
-	absPath, err := filepath.Abs(strings.Trim(name, " "))
-	if err != nil {
-		return cfg, err
-	}
-	_, err = os.Stat(absPath)
-	if err != nil {
-		return cfg, err
-	}
-	jsonData, err := ioutil.ReadFile(absPath)
-	if err != nil {
-		return cfg, err
-	}
-	err = json.Unmarshal(jsonData, cfg)
-	return cfg, err
-}
-
-// Configuration reads configuration file and does its validation.
-func Configuration(fileName string) (*Config, error) {
-	cfg, err := readConfigurationFile(fileName)
-	if err != nil {
-		return nil, err
-	}
-	data, err := ioutil.ReadFile(cfg.Server.PublicKey)
-	if err != nil {
-		return nil, err
-	}
-	block, _ := pem.Decode(data)
-	if block == nil || block.Type != "RSA PUBLIC KEY" {
-		return nil, errors.New("failed to decode PEM block containing public key")
-	}
-	key, err := x509.ParsePKCS1PublicKey(block.Bytes)
-	if err != nil {
-		return nil, err
-	}
-	cfg.Server.publicKey = key
-	udpConn, err := net.DialUDP("udp", nil, cfg.Server.UDPAddr())
-	if err != nil {
-		return nil, err
-	}
-	cfg.Server.udpConn = udpConn
-	return cfg, nil
 }

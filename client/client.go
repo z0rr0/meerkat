@@ -23,6 +23,7 @@ import (
 	"os"
 	"runtime"
 
+	"github.com/z0rr0/meerkat/conf"
 	"github.com/z0rr0/meerkat/packet"
 )
 
@@ -64,8 +65,8 @@ func main() {
 		fmt.Printf("%v: %v %v %v %v\n", Name, Version, Revision, GoVersion, Date)
 		return
 	}
-
-	cfg, err := Configuration(*config)
+	cfg := &Config{}
+	err := conf.ReadFile(cfg, *config)
 	if err != nil {
 		loggerError.Fatalln(err)
 	}
