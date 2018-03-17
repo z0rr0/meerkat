@@ -19,8 +19,10 @@ package main
 import (
 	"crypto/rsa"
 	"crypto/x509"
+	"encoding/json"
 	"encoding/pem"
 	"errors"
+	"io/ioutil"
 	"net"
 )
 
@@ -50,7 +52,15 @@ type Config struct {
 
 // Load initializes client configuration.
 func (c *Config) Load(data []byte) error {
-	block, _ := pem.Decode(data)
+	err := json.Unmarshal(data, c)
+	if err != nil {
+		return err
+	}
+	keyData, err := ioutil.ReadFile(c.Server.PublicKey)
+	if err != nil {
+		return err
+	}
+	block, _ := pem.Decode(keyData)
 	if block == nil || block.Type != "RSA PUBLIC KEY" {
 		return errors.New("failed to decode PEM block containing public key")
 	}

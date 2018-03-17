@@ -22,6 +22,7 @@ import (
 	"crypto/rsa"
 	"crypto/tls"
 	"crypto/x509"
+	"encoding/json"
 	"encoding/pem"
 	"errors"
 	"fmt"
@@ -186,7 +187,15 @@ func (c *Config) DbConnect(ctx context.Context) (context.Context, error) {
 
 // Load initializes server configuration.
 func (c *Config) Load(data []byte) error {
-	block, _ := pem.Decode(data)
+	err := json.Unmarshal(data, c)
+	if err != nil {
+		return err
+	}
+	keyData, err := ioutil.ReadFile(c.Server.PrivateKey)
+	if err != nil {
+		return err
+	}
+	block, _ := pem.Decode(keyData)
 	if block == nil || block.Type != "RSA PRIVATE KEY" {
 		return errors.New("failed to decode PEM block containing private key")
 	}
