@@ -33,8 +33,8 @@ test: lint
 
 bench: lint
 	go test -bench=. -benchmem -v $(ROOTPKG)/packet
-	go test -bench=. -benchmem -v $(ROOTPKG)/client
-	go test -bench=. -benchmem -v $(ROOTPKG)/client
+#	go test -bench=. -benchmem -v $(ROOTPKG)/server
+#	go test -bench=. -benchmem -v $(ROOTPKG)/client
 
 clean:
 	rm -rf $(GOPATH)/$(BIN)/server $(GOPATH)/$(BIN)/client

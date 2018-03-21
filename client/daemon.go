@@ -63,7 +63,7 @@ func workerCommand(s *Service, serviceID uint16, packetSize int, co chan<- *pack
 		} else {
 			loggerInfo.Printf("worker [%v]: %v bytes\n", serviceID, l)
 			copy(p.Payload, buf[0:l])
-			co <- p
+			co <- p  // co is not buffered channel
 		}
 		timer.Reset(d)
 	}

@@ -32,14 +32,14 @@ func TestEncodeDecode(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	a := &Packet{ServiceID: 123, ClientID: clientID, Payload: payload}
-	data := Encode(a)
+	packet := &Packet{ServiceID: 123, ClientID: clientID, Payload: payload}
+	data := Encode(packet)
 	if len(data) == 0 {
 		t.Error("empty encoded bytes slice")
 	}
 
 	b := Decode(data)
-	if err := compare(a, b); err != nil {
+	if err := compare(packet, b); err != nil {
 		t.Errorf("decode error: %v\n", err)
 	}
 }
@@ -58,5 +58,41 @@ func TestMaxPacketSize(t *testing.T) {
 	t.Log(payload)
 	if payload != MaxPacketPayloadSize(&pk.PublicKey) {
 		t.Errorf("invlaid payload size=%v", payload)
+	}
+}
+
+func BenchmarkEncode(b *testing.B) {
+	payload := make([]byte, 256)
+	clientID := make([]byte, hashSize)
+
+	if _, err := rand.Read(payload); err != nil {
+		b.Fatal(err)
+	}
+	if _, err := rand.Read(clientID); err != nil {
+		b.Fatal(err)
+	}
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		packet := &Packet{ServiceID: 123, ClientID: clientID, Payload: payload}
+		Encode(packet)
+	}
+}
+
+func BenchmarkDecode(b *testing.B) {
+	payload := make([]byte, 256)
+	clientID := make([]byte, hashSize)
+
+	if _, err := rand.Read(payload); err != nil {
+		b.Fatal(err)
+	}
+	if _, err := rand.Read(clientID); err != nil {
+		b.Fatal(err)
+	}
+	packet := &Packet{ServiceID: 123, ClientID: clientID, Payload: payload}
+	data := Encode(packet)
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		Decode(data)
 	}
 }
